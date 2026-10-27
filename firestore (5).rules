@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function uname() { return request.auth.token.email.split('@')[0]; }
+    function isAdmin() { return signedIn() && request.auth.token.email == 'admin@siageda.app'; }
+    function isBuiltin() {
+      return uname() in ['admin', 'viewer', 'wadir_pesantren', 'wadir_pengasuhan', 'wadir_pendidikan',
+                         'wadir_saspras', 'kesekretariatan', 'keuangan', 'lembaga_bahasa', 'mudir_pesantren'];
+    }
+    function hasProfile() { return exists(/databases/$(database)/documents/users/$(uname())); }
+    function profile() { return get(/databases/$(database)/documents/users/$(uname())).data; }
+    // akun aktif = akun bawaan, atau akun tambahan yang profilnya belum dihapus admin
+    function isActive() { return signedIn() && (isBuiltin() || hasProfile()); }
+    function isSecretariat() { return isAdmin() || (isActive() && hasProfile() && profile().role == 'SECRETARIAT'); }
+    function ownsUnit(unitKey) {
+      return isActive() && (
+        uname().upper() == unitKey ||
+        (hasProfile() && profile().role == 'UNIT' && profile().unit == unitKey)
+      );
+    }
+
+    match /agendas/{id} {
+      allow read: if isActive();
+      allow create: if isSecretariat()
+        || (ownsUnit(request.resource.data.unitKey) && request.resource.data.verified == false);
+      allow update: if isSecretariat()
+        || (ownsUnit(resource.data.unitKey)
+            && request.resource.data.unitKey == resource.data.unitKey
+            && request.resource.data.verified == resource.data.verified);
+      allow delete: if isSecretariat() || ownsUnit(resource.data.unitKey);
+    }
+
+    match /users/{username} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+  }
+}
