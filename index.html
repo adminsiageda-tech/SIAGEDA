@@ -549,6 +549,7 @@
                         <option value="ongoing">🔄 Berlangsung</option>
                         <option value="completed">✅ Selesai</option>
                     </select>
+                    <p id="agendaStatusHint" class="hidden text-[10px] text-amber-700 mt-1"><i class="fa-solid fa-lock"></i> Status dikunci. Agenda berstatus Usulan & Draf sampai diverifikasi Sekretariat.</p>
                 </div>
 
                 <div>
@@ -838,6 +839,16 @@
         function lockUnit() {
             const sel = document.getElementById('agendaUnit');
             if (currentUserRole === 'UNIT') { sel.value = currentUnitKey; sel.disabled = true; } else sel.disabled = false;
+            const st = document.getElementById('agendaStatus');
+            const hint = document.getElementById('agendaStatusHint');
+            if (currentUserRole === 'UNIT') {
+                if (!document.getElementById('agendaId').value) st.value = 'draft';
+                st.disabled = true; st.classList.add('opacity-60');
+                hint.classList.remove('hidden');
+            } else {
+                st.disabled = false; st.classList.remove('opacity-60');
+                hint.classList.add('hidden');
+            }
         }
         const _openNew = openModalNewAgenda, _edit = editAgenda;
         openModalNewAgenda = function(d) { _openNew(d); lockUnit(); };
@@ -1152,7 +1163,12 @@
             const endTime = document.getElementById('agendaEndTime').value;
             const endDate = document.getElementById('agendaEndDate').value || date;
             const location = document.getElementById('agendaLocation').value.trim();
-            const status = document.getElementById('agendaStatus').value;
+            let status = document.getElementById('agendaStatus').value;
+            if (currentUserRole === 'UNIT') {
+                // Unit tidak boleh menentukan status: agenda baru selalu draf, agenda lama tetap pada status sebelumnya
+                const lama = id ? agendaList.find(a => a.id == id) : null;
+                status = lama ? lama.status : 'draft';
+            }
             const pic = document.getElementById('agendaPic').value.trim();
             const checklistRaw = document.getElementById('agendaChecklist').value;
             
